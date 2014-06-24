@@ -22,6 +22,8 @@ with qw/
           npg_tracking::glossary::tag
        /;
 
+our $VERSION = '0';
+
 =head1 NAME
 
 st::api::lims::samplesheet
@@ -137,6 +139,10 @@ sub _build_data {
       if ($row->{'Index'}) {
         $row->{'default_tag_sequence'} = $row->{'Index'};
         delete $row->{'Index'};
+        if ($row->{'Index2'}) {
+          $row->{'default_tag_sequence'} .= $row->{'Index2'};
+          delete $row->{'Index2'};
+        }
       }
       my $index = $row->{'tag_index'};
       if ($index) {
@@ -446,7 +452,7 @@ __END__
 
 =head1 AUTHOR
 
-Author: Marina Gourtovaia E<lt>mg8@sanger.ac.ukE<gt>
+Marina Gourtovaia E<lt>mg8@sanger.ac.ukE<gt>
 
 =head1 LICENSE AND COPYRIGHT
 

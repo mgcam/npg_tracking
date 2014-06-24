@@ -1,17 +1,8 @@
-#########
-# Author:        Marina Gourtovaia
-# Maintainer:    $Author: mg8 $
-# Created:       29 July 2009
-# Last Modified: $Date: 2013-01-23 16:49:39 +0000 (Wed, 23 Jan 2013) $
-# Id:            $Id: 10-reference-find.t 16549 2013-01-23 16:49:39Z mg8 $
-# $HeadURL: svn+ssh://svn.internal.sanger.ac.uk/repos/svn/new-pipeline-dev/npg-tracking/trunk/t/10-reference-find.t $
-#
-
 package reference;
 
 use strict;
 use warnings;
-use Test::More tests => 44;
+use Test::More tests => 49;
 use Test::Exception;
 use File::Spec::Functions qw(catfile);
 use Cwd qw(cwd);
@@ -20,6 +11,7 @@ use Test::MockObject;
 
 my $central = catfile(cwd, q[t/data/repos]);
 my $repos = catfile(cwd, q[t/data/repos/references]);
+my $transcriptome_repos = catfile(cwd, q[t/data/repos1]);
 my $bwa_human_ref = q[Human/NCBI36/all/bwa/someref.fa];
 
 use_ok('npg_tracking::data::reference::find');
@@ -168,6 +160,23 @@ use_ok('npg_tracking::data::reference::find');
   $lims->mock( 'reference_genome', sub { $no_align } );
   is($ruser->lims2ref($lims), q[], qq[no reference returned for '$no_align' option]);
   is($ruser->messages->pop, $no_align, 'correct message saved');
+}
+
+{
+  my $ruser = Moose::Meta::Class->create_anon_class(
+      roles => [qw/npg_tracking::data::transcriptome::find/])
+      ->new_object({ repository => $transcriptome_repos });
+  is(join(q[ ],$ruser->_parse_reference_genome(q[Homo_sapiens (1000Genomes_hs37d5 + ensembl_74_transcriptome)])),'Homo_sapiens 1000Genomes_hs37d5 ensembl_74_transcriptome','transcriptome ref genome parsing ok with correct format'); 
+  is(join(q[ ],$ruser->_parse_reference_genome(q[Homo_sapiens (1000Genomes_hs37d5 ; ensembl_74_transcriptome)])),q[],'transcriptome ref genome parsing ok - returns empty with incorrect delimiter'); 
+  is(join(q[ ],$ruser->_parse_reference_genome(q[Homo_sapiens (1000Genomes_hs37d5 ensembl_74_transcriptome)])),q[],'transcriptome ref genome parsing ok - returns empty with missing delimiter'); 
+  is(join(q[ ],$ruser->_parse_reference_genome(q[Homo_sapiens (1000Genomes_hs37d5 + ensembl_74_transcriptome])),q[],'transcriptome ref genome parsing ok - returns empty with missing bracket'); 
+
+  $ruser = Moose::Meta::Class->create_anon_class(
+          roles => [qw/npg_tracking::data::reference::find/])
+          ->new_object({ 'repository' => $transcriptome_repos, 'aligner' => 'fasta' });
+  my $lims = Test::MockObject->new();
+  $lims->mock( 'reference_genome', sub { q[Homo_sapiens (1000Genomes_hs37d5 + ensembl_74_transcriptome)] } );
+  is ($ruser->lims2ref($lims), catfile($transcriptome_repos, q[references/Homo_sapiens/1000Genomes_hs37d5/all/fasta/hs37d5.fa]), 'find fasta genome reference even when transcriptome also given in key');
 }
 
 1;

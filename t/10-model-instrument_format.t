@@ -1,11 +1,3 @@
-#########
-# Author:        rmp
-# Maintainer:    $Author: mg8 $
-# Created:       2007-10
-# Last Modified: $Date: 2012-01-17 13:57:20 +0000 (Tue, 17 Jan 2012) $
-# Id:            $Id: 10-model-instrument_format.t 14928 2012-01-17 13:57:20Z mg8 $
-# $HeadURL: svn+ssh://svn.internal.sanger.ac.uk/repos/svn/new-pipeline-dev/npg-tracking/trunk/t/10-model-instrument_format.t $
-#
 use strict;
 use warnings;
 use t::util;
@@ -14,7 +6,6 @@ use Test::More tests => 15;
 use Test::Trap;
 use Test::Deep;
 
-use Readonly; Readonly::Scalar our $VERSION => do { my ($r) = q$Revision: 14928 $ =~ /(\d+)/mx; $r; };
 our $IF = 'npg::model::instrument_format';
 
 use_ok($IF);
@@ -35,8 +26,8 @@ my $util = t::util->new({fixtures => 1});
         });
   my $cifs = $if->current_instrument_formats();
   isa_ok($cifs, 'ARRAY');
-  is((scalar @{$cifs}), 6, 'unprimed cache cif');
-  is((scalar @{$if->current_instrument_formats()}), 6, 'primed cache cif');
+  is((scalar @{$cifs}), 7, 'unprimed cache cif');
+  is((scalar @{$if->current_instrument_formats()}), 7, 'primed cache cif');
 }
 
 {

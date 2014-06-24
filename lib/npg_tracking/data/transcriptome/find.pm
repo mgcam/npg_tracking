@@ -11,9 +11,8 @@ use Readonly;
 
 with qw/ npg_tracking::data::reference::find /;
 
-our $VERSION = '0.0';
+our $VERSION = '0';
 
-Readonly::Scalar our $ENSEMBL_RELEASE_VERSION => q[default];
 
 has '_organism_dir' => ( isa => q{Maybe[Str]},
                          is => q{ro},
@@ -26,6 +25,7 @@ sub _build__organism_dir {
   if ($organism){
     return($self->transcriptome_repository . "/$organism");
   }
+  $self->messages->push('No organism found');
   return;
 }
 
@@ -37,11 +37,15 @@ has '_version_dir' => ( isa => q{Maybe[Str]},
 
 sub _build__version_dir {
   my $self = shift;
-  my ($organism, $strain) = $self->_parse_reference_genome($self->lims->reference_genome);
+
+  my ($organism, $strain, $transcriptome_version) = $self->_parse_reference_genome($self->lims->reference_genome);
   if ($organism && $strain){
-    return($self->_organism_dir . "/$ENSEMBL_RELEASE_VERSION/$strain");
+      if ($transcriptome_version){
+          return($self->_organism_dir . "/$transcriptome_version/$strain/");
+      }
+      $self->messages->push('Not returning transcriptome directory as version not given ' . $self->lims->reference_genome);
   }
-  return;
+ return;
 }
 
 has 'gtf_path'     => ( isa => q{Maybe[Str]},
@@ -52,7 +56,10 @@ has 'gtf_path'     => ( isa => q{Maybe[Str]},
 sub _build_gtf_path {
   my $self = shift;
   ## symbolic link to default resolved with abs_path
-  return abs_path($self->_version_dir . '/gtf');
+  if ($self->_version_dir){
+      return abs_path($self->_version_dir . '/gtf');
+  }
+  return;
 }
 
 has 'gtf_file' => ( isa => q{Maybe[Str]},
@@ -67,7 +74,7 @@ sub _build_gtf_file {
   if (scalar @gtf_files > 1) { croak 'More than 1 gtf file in ' . $self->gtf_path; }
 
   if (scalar @gtf_files == 0) {
-    if (-d $self->_organism_dir) {
+    if ($self->_organism_dir && -d $self->_organism_dir) {
       $self->messages->push('Directory ' . $self->_organism_dir . ' exists, but GTF file not found');
     }
     return;
@@ -75,7 +82,7 @@ sub _build_gtf_file {
   return $gtf_files[0];
 }
 
-#transcriptomes/Homo_sapiens/ensembl_release_75/1000Genomes_hs37d5/tophat2/
+#transcriptomes/Homo_sapiens/ensembl_75_transcriptome/1000Genomes_hs37d5/tophat2/
 has 'transcriptome_index_path' => ( isa => q{Maybe[Str]},
                                     is => q{ro},
                                     lazy_build => 1,
@@ -84,7 +91,10 @@ has 'transcriptome_index_path' => ( isa => q{Maybe[Str]},
 
 sub _build_transcriptome_index_path {
   my $self = shift;
-  return abs_path($self->_version_dir . '/tophat2');
+  if ( $self->_version_dir){
+     return abs_path($self->_version_dir . '/tophat2');
+  }
+  return;
 }
 
 #e.g. 1000Genomes_hs37d5.known (from 1000Genomes_hs37d5.known.1.bt2, 1000Genomes_hs37d5.known.2.bt2 ...)
@@ -100,7 +110,7 @@ sub _build_transcriptome_index_name {
   if ($self->transcriptome_index_path){ @indices = glob $self->transcriptome_index_path . '/*.bt2'}
 
   if (scalar @indices == 0){
-    if (-d $self->_organism_dir) {
+    if ($self->_organism_dir && -d $self->_organism_dir) {
       $self->messages->push('Directory ' . $self->_organism_dir . ' exists, but GTF file not found');
     }
     return;
@@ -120,12 +130,13 @@ __END__
 
 npg_tracking::data::transcriptome::find
 
+=head1 VERSION
+
 =head1 SYNOPSIS
 
   package MyPackage;
   use Moose;
   with qw{npg_tracking::data::transcriptome::find};
-
 
 =head1 DESCRIPTION
 
@@ -179,9 +190,11 @@ Documentation on GTF (GFF version2) format http://www.ensembl.org/info/website/u
 
 =head1 AUTHOR
 
+Jillian Durham
+
 =head1 LICENSE AND COPYRIGHT
 
-Copyright (C) 2014 Jillian Durham (jillian@sanger.ac.uk)
+Copyright (C) GRL by 2014 Jillian Durham (jillian@sanger.ac.uk)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

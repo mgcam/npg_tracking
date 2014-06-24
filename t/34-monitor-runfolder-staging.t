@@ -1,10 +1,6 @@
 #########
 # Author:        jo3
-# Maintainer:    $Author: jo3 $
 # Created:       2010-06-15
-# Last Modified: $Date: 2010-11-03 10:58:34 +0000 (Wed, 03 Nov 2010) $
-# Id:            $Id: 34-monitor-runfolder-staging.t 11585 2010-11-03 10:58:34Z jo3 $
-# $HeadURL: svn+ssh://svn.internal.sanger.ac.uk/repos/svn/new-pipeline-dev/npg-tracking/trunk/t/34-monitor-runfolder-staging.t $
 #
 use strict;
 use warnings;
@@ -15,17 +11,16 @@ use File::Copy;
 use File::Find;
 use File::Temp qw(tempdir);
 
-use Test::More tests => 53;
+use Test::More tests => 47;
 use Test::Exception::LessClever;
 use Test::Warn;
 use Test::Deep;
 use IPC::System::Simple; #needed for Fatalised/autodying system()
 use autodie qw(:all);
 
-#use lib q{t};
 use t::dbic_util;
 
-use Readonly; Readonly::Scalar our $VERSION => do { my ($r) = q$Revision: 11585 $ =~ /(\d+)/msx; $r; };
+use Readonly;
 
 Readonly::Scalar my $MOCK_STAGING => 't/data/gaii/staging';
 
@@ -44,7 +39,7 @@ my $schema = t::dbic_util->new->test_schema();
                     _schema        => $schema, )
          }
          'Object creation ok';
-    is($test->netcopy_complete_wait, 600, 'default netcopy complete wait time');
+    is($test->rta_complete_wait, 600, 'default rta complete wait time');
 }
 
 {
@@ -116,90 +111,19 @@ my $schema = t::dbic_util->new->test_schema();
  
     my $mock_path = $tmpdir . '/100914_HS3_05281_A_205MBABXX';
 
-    rename "$mock_path/RunInfo.xml", "$mock_path/R_o_unInfo.xml";
-    rename "$mock_path/R_mx_unInfo.xml", "$mock_path/RunInfo.xml";
-
     my $test = Monitor::RunFolder::Staging->new( runfolder_path => $mock_path,
                                               _schema        => $schema,
-                                              netcopy_complete_wait => 15);
+                                              rta_complete_wait => 15);
 
-    rename "$mock_path/Basecalling_Netcopy_complete_READ2.txt", 
-           "$mock_path/Basecalling_Netcopy_complete_Read3.txt";
-
-    ok( $test->mirroring_complete(),
-        'Mirroring is complete - paired, multiplex, new style' );
-
-
-    rename "$mock_path/Basecalling_Netcopy_complete_Read3.txt", 
-           "$mock_path/Basecalling_Netcopy_complete_Read2.txt";
-
- 
-    ok( !$test->mirroring_complete(),
-        'Mirroring is not complete - paired, multiplex, new style' );
-
-
-    rename "$mock_path/RunInfo.xml", "$mock_path/R_mx_unInfo.xml";
-    rename "$mock_path/R_o_unInfo.xml", "$mock_path/RunInfo.xml";
-    $test = Monitor::RunFolder::Staging->new( runfolder_path => $mock_path,
-                                              _schema        => $schema,
-                                              netcopy_complete_wait => 15);
-
-
-    ok( $test->mirroring_complete(),
-        'Mirroring is complete - paired, not multiplex, new style' );
-
-
-    rename "$mock_path/Basecalling_Netcopy_complete_Read2.txt", 
-           "$mock_path/Basecalling_Netcopy_complete_Read1.txt";
+    rename "$mock_path/RTAComplete.txt", "$mock_path/RTA_renamed_Complete.txt";
 
     ok( !$test->mirroring_complete(),
-        'Mirroring is not complete - paired, not multiplex, new style' );
+        'Mirroring is not complete' );
 
-
-    rename "$mock_path/RunInfo.xml", "$mock_path/R_o_unInfo.xml";
-    rename "$mock_path/R_s_unInfo.xml", "$mock_path/RunInfo.xml";
-    $test = Monitor::RunFolder::Staging->new( runfolder_path => $mock_path,
-                                              _schema        => $schema,
-                                              netcopy_complete_wait => 15);
-
-    rename "$mock_path/Basecalling_Netcopy_complete_Read1.txt",
-           "$mock_path/Basecalling_Netcopy_complete_Read1.txt";
+    rename "$mock_path/RTA_renamed_Complete.txt", "$mock_path/RTAComplete.txt";
 
     ok( $test->mirroring_complete(),
-        'Mirroring is complete - single read, not multiplex, new style' );
-
-
-    rename "$mock_path/Basecalling_Netcopy_complete_Read1.txt", 
-           "$mock_path/Basecalling_Netcopy_complete_temp.txt";
-
-    ok( !$test->mirroring_complete(),
-        'Mirroring is not complete - single read, not multiplex, new style' );
-
-    rename "$mock_path/RunInfo.xml", "$mock_path/R_s_unInfo.xml";
-    rename "$mock_path/R_smx_unInfo.xml", "$mock_path/RunInfo.xml";
-    $test = Monitor::RunFolder::Staging->new( runfolder_path => $mock_path,
-                                              _schema        => $schema,
-                                              netcopy_complete_wait => 15);
-
-
-    rename "$mock_path/Basecalling_Netcopy_complete_temp.txt", 
-           "$mock_path/Basecalling_Netcopy_complete_Read2.txt";
-
-    ok( $test->mirroring_complete(),
-        'Mirroring is complete - single read, multiplex, new style' );
-
-
-    rename "$mock_path/Basecalling_Netcopy_complete_Read2.txt", 
-           "$mock_path/Basecalling_Netcopy_complete_Read1.txt";
-
-    ok( !$test->mirroring_complete(),
-        'Mirroring is not complete - single read, multiplex, new style' );
-
-
-    rename "$mock_path/Basecalling_Netcopy_complete_Read1.txt", 
-           "$mock_path/Basecalling_Netcopy_complete_READ2.txt";
-    rename "$mock_path/RunInfo.xml", "$mock_path/R_smx_unInfo.xml";
-    rename "$mock_path/R_o_unInfo.xml", "$mock_path/RunInfo.xml";
+        'Mirroring is complete' );
 }
 
 

@@ -1,10 +1,6 @@
 #########
 # Author:        jo3
-# Maintainer:    $Author: mg8 $
 # Created:       19/10/2010
-# Last Modified: $Date: 2013-01-07 11:04:50 +0000 (Mon, 07 Jan 2013) $
-# Id:            $Id: Staging.pm 16389 2013-01-07 11:04:50Z mg8 $
-# $HeadURL: svn+ssh://svn.internal.sanger.ac.uk/repos/svn/new-pipeline-dev/npg-tracking/trunk/lib/Monitor/RunFolder/Staging.pm $
 
 package Monitor::RunFolder::Staging;
 
@@ -18,18 +14,19 @@ use File::Find;
 use IO::All;
 use List::Util qw(max);
 use Perl6::Slurp;
+use Readonly;
 
-use Readonly; Readonly::Scalar our $VERSION => do { my ($r) = q$Revision: 16389 $ =~ /(\d+)/smx; $r; };
+our $VERSION = '0';
 
 Readonly::Scalar my $MAXIMUM_CYCLE_LAG  =>  6;
 Readonly::Scalar my $MTIME_INDEX        =>  9;
 Readonly::Scalar my $SECONDS_PER_MINUTE => 60;
-Readonly::Scalar my $NETCOPY_COMPLETE   => 10 * $SECONDS_PER_MINUTE;
+Readonly::Scalar my $RTA_COMPLETE   => 10 * $SECONDS_PER_MINUTE;
 
-has 'netcopy_complete_wait' => (isa          => 'Int',
-                                is           => 'ro',
-                                default      => $NETCOPY_COMPLETE,
-                               );
+has 'rta_complete_wait' => (isa          => 'Int',
+                            is           => 'ro',
+                            default      => $RTA_COMPLETE,
+                           );
 
 
 sub cycle_lag {
@@ -77,9 +74,9 @@ sub mirroring_complete {
         or do { carp $EVAL_ERROR; return 0; };
 
 
-    my $netcopy = 'Basecalling_Netcopy_complete_Read'.scalar $self->read_cycle_counts;
+    my $rta = 'RTAComplete';
 
-    my @markers = map {q().$_} grep { $_ =~ m/ $netcopy /msx } @file_list;
+    my @markers = map {q().$_} grep { $_ =~ m/ $rta /msx } @file_list;
 
     my $mtime = ( scalar @markers )
                 ? ( stat $markers[0] )[$MTIME_INDEX]
@@ -92,7 +89,7 @@ sub mirroring_complete {
         qr{Copying[ ]logs[ ]to[ ]network[ ]run[ ]folder\s* \Z }msx;
 
 
-    return ( $last_modified > $self->netcopy_complete_wait ) ? 1
+    return ( $last_modified > $self->rta_complete_wait ) ? 1
          : ( $events_log =~ $events_regex )       ? 1
          :                                          0;
 }
@@ -129,6 +126,11 @@ sub check_tiles {
     my @lanes   = glob "$path/Data/Intensities/L*";
     @lanes      = grep { m/ L \d+ $ /msx } @lanes;
     my $l_count = scalar @lanes;
+    if ( !$l_count ){
+        @lanes   = glob "$path/Data/Intensities/BaseCalls/L*";
+        @lanes      = grep { m/ L \d+ $ /msx } @lanes;
+        $l_count = scalar @lanes;
+    }
 
     if ( $l_count != $expected_lanes ) {
         carp "Missing lane(s) - [$expected_lanes $l_count]";
@@ -159,8 +161,8 @@ sub check_tiles {
 
         foreach my $cycle ( @cycles) {
             my $filetype = $cifs_present ? 'cif' : 'bcl';
-            my @tiles   = glob "$cycle/*.$filetype";
-            @tiles      = grep { m/ s_ \d+ _ \d+ [.] $filetype $ /msx } @tiles;
+            my @tiles   = glob "$cycle/*.$filetype" . q({,.gz});
+            @tiles      = grep { m/ s_ \d+ _ \d+ [.] $filetype (?: [.] gz )? $ /msx } @tiles;
             my $t_count = scalar @tiles;
 
             if ( $t_count != $expected_tiles ) {
@@ -275,7 +277,6 @@ local staging
 
 =head1 VERSION
 
-$Revision: 16389 $
 
 =head1 SYNOPSIS
 

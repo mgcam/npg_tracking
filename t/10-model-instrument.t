@@ -1,19 +1,9 @@
-#########
-# Author:        rmp
-# Maintainer:    $Author: mg8 $
-# Created:       2007-10
-# Last Modified: $Date: 2013-01-15 10:27:57 +0000 (Tue, 15 Jan 2013) $
-# Id:            $Id: 10-model-instrument.t 16477 2013-01-15 10:27:57Z mg8 $
-# $HeadURL: svn+ssh://svn.internal.sanger.ac.uk/repos/svn/new-pipeline-dev/npg-tracking/trunk/t/10-model-instrument.t $
-#
 use strict;
 use warnings;
 use t::util;
 use Test::More tests => 121;
 use Test::Deep;
 use Test::Exception;
-
-use Readonly; Readonly::Scalar our $VERSION => do { my ($r) = q$Revision: 16477 $ =~ /(\d+)/mx; $r; };
 
 use_ok('npg::model::instrument');
 
@@ -275,7 +265,7 @@ lives_ok {$util->fixtures_path(q[t/data/fixtures]); $util->load_fixtures;} 'a fr
 {
   my $model = npg::model::instrument->new({util => $util, id_instrument => 48,});
   ok(!$model->does_sequencing, 'instrument does not do sequencing');
-  ok(!$model->is_hiseq_instrument, 'is not hiseq instrument');
+  ok(!$model->is_two_slot_instrument, 'is not two slot instrument');
   ok($model->is_cbot_instrument, 'is cbot instrument');
   ok (!$model->is_idle, 'instrument is not idle');
   ok (!$model->status_to_change_to, 'no status to change to');
@@ -287,7 +277,7 @@ lives_ok {$util->fixtures_path(q[t/data/fixtures]); $util->load_fixtures;} 'a fr
 {
   my $model = npg::model::instrument->new({util => $util, id_instrument => 34,});
   ok($model->does_sequencing, 'instrument does sequencing');
-  ok(!$model->is_hiseq_instrument, 'is not hiseq instrument');
+  ok(!$model->is_two_slot_instrument, 'is not two slot instrument');
   is($model->fc_slots2current_runs, undef, 'does not have mapping of slots to current runs');
   is($model->fc_slots2blocking_runs, undef, 'does not have mapping of slots to blocking runs');
   ok ($model->is_idle, 'instrument is idle');
@@ -299,7 +289,7 @@ lives_ok {$util->fixtures_path(q[t/data/fixtures]); $util->load_fixtures;} 'a fr
 {
   my $model = npg::model::instrument->new({util => $util, id_instrument => 35,});
   ok($model->does_sequencing, 'instrument does sequencing');
-  ok($model->is_hiseq_instrument, 'is hiseq instrument');
+  ok($model->is_two_slot_instrument, 'is two_slot instrument');
   my $expected = {fc_slotA => [], fc_slotB => [],};
   cmp_deeply($model->fc_slots2current_runs, $expected, 'empty mapping of slots to current runs');
   cmp_deeply($model->fc_slots2blocking_runs, $expected, 'empty mapping of slots to blocking runs');
@@ -311,7 +301,7 @@ lives_ok {$util->fixtures_path(q[t/data/fixtures]); $util->load_fixtures;} 'a fr
 
 {
   my $model = npg::model::instrument->new({util => $util, id_instrument => 36,});
-  ok($model->is_hiseq_instrument, 'is hiseq instrument');
+  ok($model->is_two_slot_instrument, 'is two_slot instrument');
   my $run = $model->current_runs->[0];
   is ($run->id_run, 9951, 'first current run');
 
