@@ -8,3 +8,8 @@ before_script:
   - mysql -e 'create database npgt;'
 env:
   - TEST_AUTHOR=1 TZ=Europe/London
+install:
+  - perl Build.PL
+  - yes | perl Build installdeps --verbose
+
+script: "perl Build.PL && ./Build && ./Build test"
