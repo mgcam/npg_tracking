@@ -34,12 +34,13 @@ sub ACTION_code {
     return;
   }
   warn "Changing version of all modules and scripts to $gitver\n";
-  find({'wanted' => \&_change_version, 'follow' => 0, 'no_chdir' => 1, 'prune' => 1,}, @dirs);
+  find({'wanted' => \&_change_version, 'follow' => 0, 'no_chdir' => 1,}, @dirs);
   return;
 }
 
 sub _change_version {
   my $module = $File::Find::name;
+  warn "MODULE $module \n";
   if (-d $module) {
     return;
   }
