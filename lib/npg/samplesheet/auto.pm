@@ -32,7 +32,7 @@ npg::samplesheet::auto
 
   use npg::samplesheet::auto;
   use Log::Log4perl qw(:easy);
-  BEGIN{ Log::Log4perl->easy_init({level=>$INFO,}); }
+  BEGIN{ Log::Log4perl->easy_init($INFO); }
   npg::samplesheet::auto->new()->loop(); # in a daemon
 
 =head1 DESCRIPTION
