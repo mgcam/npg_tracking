@@ -414,6 +414,7 @@ lib/st/api/base.pm
 lib/st/api/batch.pm
 lib/st/api/event.pm
 lib/st/api/lims.pm
+lib/st/api/lims/driver.pm
 lib/st/api/lims/samplesheet.pm
 lib/st/api/lims/xml.pm
 lib/st/api/project.pm
@@ -564,6 +565,7 @@ t/40-st-event.t
 t/40-st-lims-insert_size.t
 t/40-st-lims-samplesheet.t
 t/40-st-lims.t
+t/40-st-lims-driver.t
 t/40-st-project.t
 t/40-st-sample.t
 t/40-st-study.t

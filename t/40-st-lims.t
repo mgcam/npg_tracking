@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 447;
+use Test::More tests => 440;
 use Test::Exception;
 use Test::Warn;
 use File::Temp qw/ tempdir /;
@@ -31,7 +31,9 @@ my @studies_6551_1 = ('Illumina Controls','Discovery of sequence diversity in Sh
 {
   use_ok('st::api::lims::samplesheet');
   lives_and( sub{
-    my $lims = st::api::lims->new(id_run => 6551, driver => st::api::lims::samplesheet->new(id_run => 6551, path => $ENV{NPG_WEBSERVICE_CACHE_DIR}));
+    my $lims = st::api::lims->new(
+      id_run => 6551,
+      driver => st::api::lims::samplesheet->new(id_run => 6551, path => $ENV{NPG_WEBSERVICE_CACHE_DIR}));
     is($lims->driver_type, 'samplesheet');
   }, 'obtain driver type from driver if driver given');
 }
@@ -492,22 +494,45 @@ my @studies_6551_1 = ('Illumina Controls','Discovery of sequence diversity in Sh
 }
 
 {
-  my $path = 't/data/samplesheet/miseq_default.csv';
+  local $ENV{'NPG_CACHED_SAMPLESHEET_FILE'} = 't/data/samplesheet';
 
-  my $ss = st::api::lims->new(id_run => 10262,  path => $path, driver_type => 'samplesheet');
+  my $ss;
+
+  lives_ok {$ss = st::api::lims->new(id_run => 10262,)}
+    'no error creating an object with samplesheet file defined in env var';
+  is ($ss->driver_type, 'samplesheet', 'driver type is samplesheet');
+  throws_ok { $ss->children }
+    qr/Is a directory/,
+    'samplesheet file var points to a directory - error';
+
+  local $ENV{'NPG_CACHED_SAMPLESHEET_FILE'} = 't/data/samplesheet/non-existing';
+  lives_ok {$ss = st::api::lims->new(id_run => 10262,)}
+    'no error creating an object with samplesheet file defined in env var';
+  is ($ss->driver_type, 'samplesheet', 'driver type is samplesheet');
+  throws_ok { $ss->children }
+    qr/Attribute \(path\) does not pass the type constraint/,
+    'samplesheet file var points to a non-exisitn file - error';
+
+  local $ENV{'NPG_CACHED_SAMPLESHEET_FILE'} = 't/data/samplesheet/miseq_default.csv';
+
+  $ss = st::api::lims->new(id_run => 10262, driver_type => 'samplesheet');
   isa_ok ($ss->driver, 'st::api::lims::samplesheet', 'samplesheet driver object instantiated');  
   my @lanes;
   lives_ok {@lanes = $ss->children}  'can get lane-level objects';
   is ($lanes[0]->id_run, 10262, 'lane id_run as set');
 
-  $ss = st::api::lims->new(id_run => 10000,  path => $path, driver_type => 'samplesheet');
+  $ss = st::api::lims->new(id_run => 10000);
+  is ($ss->driver_type, 'samplesheet', 'samplesheet driver type');
+  isa_ok ($ss->driver, 'st::api::lims::samplesheet', 'samplesheet driver object instantiated');
+  is ($ss->driver->path, $ENV{'NPG_CACHED_SAMPLESHEET_FILE'}, 'driver path is set correctly');
+
   is ($ss->id_run, 10000, 'id_run as set');
   warning_is {@lanes = $ss->children} 
     q[Supplied id_run 10000 does not match Experiment Name, 10262],
     'can get lane-level objects, get warned about id_run mismatch';
   is ($lanes[0]->id_run, 10000, 'lane id_run as set, differs from Experiment Name');
 
-  $ss = st::api::lims->new(path => $path, driver_type => 'samplesheet');
+  $ss = st::api::lims->new();
   is ($ss->is_pool, 0, 'is_pool false on run level');
   is ($ss->is_control, undef, 'is_control undef on run level');
   is ($ss->library_id, undef, 'library_id undef on run level');
@@ -545,33 +570,31 @@ my @studies_6551_1 = ('Illumina Controls','Discovery of sequence diversity in Sh
 }
 
 {
-  my $path = 't/data/samplesheet/miseq_default.csv';
-  lives_ok {st::api::lims->new(id_run => 10262, position =>2, path => $path, driver_type => 'samplesheet')}
+  local $ENV{'NPG_CACHED_SAMPLESHEET_FILE'} = 't/data/samplesheet/miseq_default.csv';
+  lives_ok {st::api::lims->new(id_run => 10262, position =>2, driver_type => 'samplesheet')}
     'no error instantiation an object for a non-existing lane';
-  throws_ok {st::api::lims->new(id_run => 10262, position =>2, path => $path, driver_type => 'samplesheet')->library_id}
+  throws_ok {st::api::lims->new(id_run => 10262, position =>2, driver_type => 'samplesheet')->library_id}
     qr/Position 2 not defined in/, 'error invoking a driver method on an object for a non-existing lane';
 
-  lives_ok {st::api::lims->new(id_run => 10262, position =>2, driver_type => 'samplesheet')}
-    'no error instantiation an object without path';
-  throws_ok {st::api::lims->new(id_run => 10262, position =>2, driver_type => 'samplesheet')->library_id}
-    qr/Attribute \(path\) is required/, 'error invoking a driver method on an object with path undefined';
   my $nopath = join q[/], tempdir( CLEANUP => 1 ), 'xxx';
-  throws_ok {st::api::lims->new(id_run => 10262, path => $nopath, position =>2, driver_type => 'samplesheet')->library_id}
+  local $ENV{'NPG_CACHED_SAMPLESHEET_FILE'} = $nopath;
+  throws_ok {st::api::lims->new(id_run => 10262, position =>2, driver_type => 'samplesheet')->library_id}
     qr/Validation failed for 'NpgTrackingReadableFile'/, 'error invoking a driver method on an object with non-existing path';
  
-  my $ss=st::api::lims->new(id_run => 10262, position =>1, path => $path);
+  local $ENV{'NPG_CACHED_SAMPLESHEET_FILE'} = 't/data/samplesheet/miseq_default.csv';
+  my $ss=st::api::lims->new(id_run => 10262, position =>1);
   is ($ss->driver_type, 'samplesheet', 'driver type built correctly');
   is ($ss->position, 1, 'correct position');
   is ($ss->is_pool, 1, 'lane is a pool');
   is ($ss->library_id, undef, 'pool lane library_id undefined');
   is (scalar $ss->children, 96, '96 plexes returned');
 
-  lives_ok {st::api::lims->new(id_run => 10262, position =>1, tag_index=>999,path => $path, driver_type => 'samplesheet')}
+  lives_ok {st::api::lims->new(id_run => 10262, position =>1, tag_index=>999, driver_type => 'samplesheet')}
     'no error instantiation an object for a non-existing tag_index';
-  throws_ok {st::api::lims->new(id_run => 10262, position =>1, tag_index => 999, path => $path, driver_type => 'samplesheet')->children}
+  throws_ok {st::api::lims->new(id_run => 10262, position =>1, tag_index => 999, driver_type => 'samplesheet')->children}
     qr/Tag index 999 not defined in/, 'error invoking a driver method on an object for a non-existing tag_index';
 
-  $ss=st::api::lims->new(id_run => 10262, position =>1, tag_index => 3, path => $path, driver_type => 'samplesheet');
+  $ss=st::api::lims->new(id_run => 10262, position =>1, tag_index => 3, driver_type => 'samplesheet');
   is ($ss->position, 1, 'correct position');
   is ($ss->tag_index, 3, 'correct tag_index');
   is ($ss->is_pool, 0, 'plex is not a pool');
@@ -581,41 +604,12 @@ my @studies_6551_1 = ('Illumina Controls','Discovery of sequence diversity in Sh
   is ($ss->sample_name, 'LIA_3', 'sample name is correct');
   is (scalar $ss->children, 0, 'zero children returned');
 
-  $ss=st::api::lims->new(id_run => 10262, position =>1, tag_index => 0, path => $path, driver_type => 'samplesheet');
+  $ss=st::api::lims->new(id_run => 10262, position =>1, tag_index => 0, driver_type => 'samplesheet');
   is (scalar $ss->children, 96, '96 children returned for tag zero');
   is ($ss->is_pool, 1, 'tag zero is a pool');
   is ($ss->library_id, undef, 'tag_zero library_id undefined');
   is ($ss->default_tag_sequence, undef, 'default tag sequence undefined');
   is ($ss->tag_sequence, undef, 'tag sequence undefined');
-}
-
-{
-  my $ss_path = 't/data/samplesheet/miseq_default.csv';
-  local $ENV{NPG_CACHED_SAMPLESHEET_FILE} = $ss_path;
-  my $l;
-  lives_ok {$l = st::api::lims->new(id_run => 10262,)}
-    'no error creating an object with samplesheet file defined in env var';
-  is ($l->driver_type, 'samplesheet', 'driver type is built as samplesheet');
-  is ($l->path, $ss_path, 'correct path is built');
-  is (ref $l->driver, 'st::api::lims::samplesheet', 'correct driver object type');
-  is ($l->driver->path, $ss_path, 'correct path assigned to the driver object');
-
-  local $ENV{NPG_CACHED_SAMPLESHEET_FILE} = 't/data/samplesheet';
-  lives_ok {$l = st::api::lims->new(id_run => 10262,)}
-    'no error creating an object with samplesheet file defined in env var';
-  is ($l->driver_type, 'xml', 'driver type is xml since env var points to a directory');
-  ok (!$l->path, 'path is not built');
-
-  local $ENV{NPG_CACHED_SAMPLESHEET_FILE} = 't/data/samplesheet/non-existing';
-  lives_ok {$l = st::api::lims->new(id_run => 10262,)}
-    'no error creating an object with samplesheet file defined in env var';
-  is ($l->driver_type, 'xml', 'driver type is xml since env var points to a non-existing file');
-  ok (!$l->path, 'path is not built');
-
-  local $ENV{NPG_CACHED_SAMPLESHEET_FILE} = 't/data/samplesheet/non-existing';
-  lives_ok {$l = st::api::lims->new(id_run => 10262, path => $ss_path)}
-    'no error creating an object with samplesheet file defined in env var and path given';
-  is ($l->driver_type, 'samplesheet', 'driver type is samplesheet');
 }
 
 {

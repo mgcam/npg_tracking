@@ -9,6 +9,7 @@ use Readonly;
 use List::MoreUtils qw/none uniq/;
 
 use npg_tracking::util::types;
+use st::api::lims::driver;
 
 with qw/  npg_tracking::glossary::run
           npg_tracking::glossary::lane
@@ -38,11 +39,12 @@ Generic NPG pipeline oriented LIMS wrapper capable of retrieving data from multi
 
 =cut
 
-Readonly::Scalar my  $CACHED_SAMPLESHEET_FILE_VAR_NAME => 'NPG_CACHED_SAMPLESHEET_FILE';
+Readonly::Scalar my $CACHED_SAMPLESHEET_FILE_VAR_NAME      => 'NPG_CACHED_SAMPLESHEET_FILE';
+Readonly::Scalar my $TEST_CACHED_SAMPLESHEET_FILE_VAR_NAME => 'NPG_TEST_CACHED_SAMPLESHEET_FILE';
 
-Readonly::Scalar my  $PROC_NAME_INDEX      => 3;
-Readonly::Hash   my  %QC_EVAL_MAPPING      => {'pass' => 1, 'fail' => 0, 'pending' => undef, };
-Readonly::Scalar my  $INLINE_INDEX_END     => 10;
+Readonly::Scalar my $PROC_NAME_INDEX       => 3;
+Readonly::Hash   my %QC_EVAL_MAPPING       => {'pass' => 1, 'fail' => 0, 'pending' => undef,};
+Readonly::Scalar my $INLINE_INDEX_END      => 10;
 Readonly::Scalar my $DUAL_INDEX_TAG_LENGTH => 16;
 
 Readonly::Hash   my  %METHODS           => {
@@ -105,7 +107,6 @@ Readonly::Hash   my  %METHODS           => {
     'request'      => [qw/ request_id /],
 };
 
-Readonly::Array my @IMPLEMENTED_DRIVERS => qw/xml samplesheet ml_warehouse/;
 Readonly::Array my @DELEGATED_METHODS   => sort map { @{$_} } values %METHODS;
 
 # Mapping of LIMS object types to attributes for which methods are to
@@ -155,32 +156,50 @@ Driver type (xml, etc), currently defaults to xml
 
 =cut
 has 'driver_type' => (
-                        isa     => 'Str',
-                        is      => 'ro',
+                        isa        => 'Str',
+                        is         => 'ro',
                         lazy_build => 1,
                      );
 sub _build_driver_type {
   my $self = shift;
-  if($self->has_driver){
-    my $type = ref $self->driver;
+  
+  my $type;
+  if ($self->has_driver) {
+    $type = ref $self->driver;
     my $prefix = __PACKAGE__ . q(::);
     $type =~ s/\A\Q$prefix\E//smx;
-    return $type;
+  } else {
+    $type = $ENV{$CACHED_SAMPLESHEET_FILE_VAR_NAME} ?
+      st::api::lims::driver->samplesheet_driver_name() :
+      st::api::lims::driver->xml_driver_name();
   }
-  my $cached_path = $ENV{$CACHED_SAMPLESHEET_FILE_VAR_NAME};
-  if ($self->_has_path || ($cached_path && -f $cached_path)) {
-    if (!$self->_has_path) {
-      $self->_set_path($cached_path);
-      $self->clear_batch_id();
-    }
-    return $IMPLEMENTED_DRIVERS[1];
-  }
-  return $IMPLEMENTED_DRIVERS[0];
+
+  return $type;
 }
+
+#########
+#
+# If the driver object is not given explicitly and we are testing,
+# overwrite the driver type even if set by the caller, unless
+# it's xml, and set it to samplesheet.
+#
+around 'driver_type' => sub {
+  my $orig = shift;
+  my $self = shift;
+  
+  my $driver_type = $self->$orig();
+  my $xml_dname = st::api::lims::driver->xml_driver_name();
+  if (!$self->has_driver && ($samplesheet_dname ne $xml_dname)
+     && $ENV{$TEST_CACHED_SAMPLESHEET_FILE_VAR_NAME} ) {
+    $driver_type = st::api::lims::driver->samplesheet_driver_name();
+  }
+
+  return $driver_type;
+};
 
 =head2 driver
 
-Driver object (xml, warehouse, samplesheet)
+Driver object (xml, warehouse, ml_warehouse, samplesheet)
 
 =cut
 has 'driver' => (
@@ -191,31 +210,18 @@ has 'driver' => (
                 );
 sub _build_driver {
   my $self = shift;
-  my $d_package = $self->_driver_package_name;
-  ##no critic (ProhibitStringyEval)
-  eval "require $d_package" or croak "Error loading package $d_package: " . $EVAL_ERROR;
-  ##use critic
-  my $ref = {};
-  foreach my $attr (qw/tag_index position id_run path id_flowcell_lims flowcell_barcode/) {
+
+  my $ref = {'driver_type' => $self->driver_type};
+  foreach my $attr (qw/tag_index position id_run id_flowcell_lims flowcell_barcode/) {
     if (defined $self->$attr) {
       $ref->{$attr} = $self->$attr;
     }
   }
-
-  if ($self->has_batch_id) {
-    $ref->{'batch_id'} = $self->batch_id;
+  if (!$self->id_flowcell_lims && $self->_has_batch_id) {
+    $ref->{'id_flowcell_lims'} = $self->batch_id;
   }
-  return $d_package->new($ref);
-}
 
-sub _driver_package_name {
-  my $self = shift;
-  my $type = $self->driver_type;
-  if (none {$type} @IMPLEMENTED_DRIVERS) {
-    croak qq[Driver type '$type' not implemented.\n Implemented drivers: ] .
-             join q[,], @IMPLEMENTED_DRIVERS;
-  }
-  return join q[::], __PACKAGE__ , $type;
+  return st::api::lims::driver->new($ref)->create_driver();
 }
 
 for my$m ( @DELEGATED_METHODS ){
@@ -297,19 +303,6 @@ sub _build__sample_description {
   return;
 }
 
-=head2 path
-
-Samplesheet path
-
-=cut
-has 'path' => (
-                  isa       => 'Str',
-                  is        => 'ro',
-                  required  => 0,
-                  predicate => '_has_path',
-                  writer    => '_set_path',
-              );
-
 =head2 id_run
 
 Run id, optional attribute.
@@ -338,6 +331,7 @@ Batch id, optional attribute.
 has 'batch_id'  =>        (isa             => 'Maybe[NpgTrackingPositiveInt]',
                            is              => 'ro',
                            lazy_build      => 1,
+                           predicate       => '_has_batch_id',
                           );
 sub _build_batch_id {
   my $self = shift;

@@ -114,7 +114,11 @@ has 'run' => (
   'lazy_build' => 1,
   'metaclass' => 'NoGetopt',
 );
-sub _build_run { my $self=shift; my$r=$self->npg_tracking_schema->resultset(q(Run))->find($self->id_run); return $r;}
+sub _build_run {
+  my $self=shift;
+  my$r=$self->npg_tracking_schema->resultset(q(Run))->find($self->id_run);
+  return $r;
+}
 
 has lims => (
   'isa' => 'ArrayRef[st::api::lims]',
@@ -124,14 +128,17 @@ has lims => (
 );
 sub _build_lims {
   my $self=shift;
+
   my $id = $self->run->batch_id;
-  if ($id=~/\A\d{13}\z/smx) {
-    ##no critic (ProhibitStringyEval)
-    eval 'require st::api::lims::warehouse' or do { croak $EVAL_ERROR;} ;
-    ##use critic
-    return [st::api::lims->new( position=>1, driver => st::api::lims::warehouse->new( position=>1, tube_ean13_barcode=>$id) )];
+  my $ref = {'id_flowcell_lims' => $id};
+  if ( $id=~/\A\d{13}\z/smx ) {
+    $ref->{'driver_type'} = st::api::lims::driver->warehouse_driver_name();
+    $ref->{'position'} = 1;
+  } else {
+    $ref->{'driver_type'} = st::api::lims::driver->ml_warehouse_driver_name();
   }
-  return [st::api::lims->new( batch_id=> $id )->children];
+
+  return [st::api::lims->new($ref)->children];
 };
 
 has output => (
@@ -157,7 +164,7 @@ sub _build_fallback_reference {
   return Moose::Meta::Class->create_anon_class(
     roles=>[qw(npg_tracking::data::reference::find)]
   )->new_object(
-    species=>$DEFAULT_FALLBACK_REFERENCE_SPECIES,
+    species => $DEFAULT_FALLBACK_REFERENCE_SPECIES,
     aligner => q(fasta),
     ($self->repository ? ('repository' => $self->repository) : ()),
   )->ref_info->ref_path;
