@@ -128,7 +128,6 @@ my $builder = $class->new(
                 'Config::Auto'                    => 0,
                 'Crypt::CBC'                      => 0,
                 'Cwd'                             => 0,
-                'Date::Calc'                      => '5.4',
                 'Date::Parse'                     => '2.27',
                 'DateTime'                        => '0.5',
                 'DateTime::TimeZone'              => 0,
@@ -176,12 +175,8 @@ my $builder = $class->new(
                 'IPC::System::Simple'             => 0,
                 'JSON'                            => '2.12',
                 'JSON::XS'                        => '2.34',
-                'JSON::Any'                       => '0',
                 'lib'                             => '0.5565',
                 'Lingua::EN::Inflect'             => 0,
-                ## {{{ This is a ClearPress dependency not declared by ClearPress
-                'Lingua::EN::PluralToSingular'    => 0,
-                ## }}}
                 'Linux::Inotify2'                 => 0,
                 'List::MoreUtils'                 => '0.416',
                 'Log::Log4perl'                   => 0,
