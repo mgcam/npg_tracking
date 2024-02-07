@@ -1,6 +1,5 @@
 LIST OF CHANGES
 
-
  - npg_tracking::illumina::run::short_info
      - Stopped parsing out run details from the run folder name. Deleted
        attributes, which were populated this way: 'name', 'instrument_string',
