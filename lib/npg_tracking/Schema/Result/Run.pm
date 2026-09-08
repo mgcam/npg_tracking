@@ -332,7 +332,6 @@ with qw/
        /;
 
 Readonly::Hash   my %STATUS_PROPAGATE_AUTO => (
-  'analysis complete'  => 'analysis complete',
   'manual qc complete' => 'archival pending',
 );
 

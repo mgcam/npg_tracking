@@ -1,5 +1,8 @@
 LIST OF CHANGES
 
+ - Dropped erroneous same status pair from a hash of run status automatic
+   changes.
+
 release 107.4.0 (2026-09-02)
  - Imported `npg_qc::ultimagen::sample_retriever` and its dependencies.
    New class is `npg_tracking::ultimagen::sample_retriever`.
